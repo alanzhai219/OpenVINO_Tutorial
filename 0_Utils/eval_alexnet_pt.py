@@ -1,51 +1,21 @@
 import os
 from PIL import Image
+from tqdm import tqdm
 import torch
 import torch.nn as nn
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 from torch.utils.data import DataLoader
 
-# Define the AlexNet model architecture
-class AlexNet(nn.Module):
-    def __init__(self, num_classes: int = 1000) -> None:
-        super(AlexNet, self).__init__()
-        self.features = nn.Sequential(
-            nn.Conv2d(3, 64, kernel_size=11, stride=4, padding=2),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-            nn.Conv2d(64, 192, kernel_size=5, padding=2),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-            nn.Conv2d(192, 384, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(384, 256, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(256, 256, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2),
-        )
-        self.avgpool = nn.AdaptiveAvgPool2d((6, 6))
-        self.classifier = nn.Sequential(
-            nn.Dropout(),
-            nn.Linear(256 * 6 * 6, 4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(),
-            nn.Linear(4096, 4096),
-            nn.ReLU(inplace=True),
-            nn.Linear(4096, num_classes),
-        )
+# from model_hack.alexnet import AlexNet
+# alexnet_model = AlexNet()
+# alexnet_model.load_state_dict(torch.load('checkpoints/alexnet-model.pth'))
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.features(x)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        x = self.classifier(x)
-        return x
-
-# Load the pre-trained AlexNet model
+from model_hack.alexnet_srelu import AlexNet
 alexnet_model = AlexNet()
-alexnet_model.load_state_dict(torch.load('alexnet-model.pth'))
+# Load the pre-trained AlexNet model
+alexnet_model.load_state_dict(torch.load('checkpoints/alexnet-model.pth'), strict=False)
+
 alexnet_model.eval()
 
 # Load validation dataset from image_folder and val.txt
@@ -93,6 +63,7 @@ val_dataset = CustomDataset(data_dir, val_txt_path, data_transforms)
 val_loader = DataLoader(val_dataset, batch_size=1, shuffle=False)
 
 # Evaluation loop
+'''
 correct = 0
 total = 0
 with torch.no_grad():
@@ -104,3 +75,30 @@ with torch.no_grad():
 
 accuracy = correct / total
 print(f'Validation Accuracy: {accuracy * 100:.2f}%')
+'''
+
+top1_correct = 0
+top5_correct = 0
+total = len(val_loader)
+
+with torch.no_grad():
+    pbar = tqdm(total=total)
+    for images, labels in val_loader:
+        outputs = alexnet_model(images)
+        _, predicted = torch.max(outputs.data, 1)
+        
+        # 计算top-1准确率
+        top1_correct += (predicted == labels).sum().item()
+        
+        # 计算top-5准确率
+        _, top5_predicted = torch.topk(outputs, 5, dim=1)
+        top5_correct += torch.sum(top5_predicted == labels.view(-1, 1)).item()
+        
+        pbar.update(len(labels))
+
+top1_accuracy = top1_correct / total
+top5_accuracy = top5_correct / total
+
+print(f'Top-1 Accuracy: {top1_accuracy * 100:.2f}%')
+print(f'Top-5 Accuracy: {top5_accuracy * 100:.2f}%')
+
