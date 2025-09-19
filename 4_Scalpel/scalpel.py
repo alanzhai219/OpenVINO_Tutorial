@@ -9,7 +9,7 @@ def parse():
     parser = argparse.ArgumentParser(description="export graph to xml file")
     parser.add_argument("--model", type=str, required=True, help="model file, support openvino")
     parser.add_argument("--device", type=str, default="CPU", help="specify the device, support CPU/GPU")
-    parser.add_argument("--ins", type=str, help="input nodes of new model file. Like --ins \"name1:0,1,2; name2:3,4; name3:5,6\"")
+    parser.add_argument("--ins", type=str, help="input nodes of new model file. Like --ins \"name1@0,1,2; name2@3,4; name3@5,6\"")
     parser.add_argument("--outs", type=str, nargs="+", help="output nodes of new model file")
     parser.add_argument("--outpath", type=str, default="out", help="specify the export xml name")
     args = parser.parse_args()
@@ -33,7 +33,7 @@ class args_pack:
             group = group.strip()
             if not group:
                 continue
-            key, values = group.split(':')
+            key, values = group.split('@')
             result[key.strip()] = [int(v) for v in values.split(',')]
         return result
 
